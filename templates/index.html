@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orchard — Transaction Fraud Detection</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;0,700;1,500&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#20291F;
+    --ink-soft:#5B6357;
+    --paper:#F8F4E9;
+    --paper-card:#FFFDF7;
+    --paper-alt:#F1EAD8;
+    --orchard:#28422F;
+    --orchard-dark:#1A2E20;
+    --leaf:#5C7A54;
+    --apple:#B23B2E;
+    --apple-soft:#F2DAD2;
+    --amber:#BD8A2E;
+    --amber-soft:#F3E7C6;
+    --safe:#3C6E49;
+    --safe-soft:#DDEAD9;
+    --line:#DED2AF;
+    --line-soft:#E9E1CB;
+    --shadow-sm:0 2px 8px rgba(32,41,31,0.06);
+    --shadow-md:0 14px 32px rgba(32,41,31,0.10);
+    --radius:14px;
+    --serif:'Lora', Georgia, serif;
+    --sans:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --mono:'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{
+    font-family:var(--sans);
+    background:
+      radial-gradient(circle at 12% 8%, rgba(92,122,84,0.08), transparent 45%),
+      radial-gradient(circle at 88% 92%, rgba(178,59,46,0.06), transparent 40%),
+      var(--paper);
+    color:var(--ink);
+    min-height:100vh;
+    padding:32px 20px 60px;
+    line-height:1.5;
+  }
+  .container{max-width:1180px;margin:0 auto;}
+
+  /* ---------- Header ---------- */
+  .masthead{
+    display:flex;
+    align-items:center;
+    gap:16px;
+    margin-bottom:6px;
+  }
+  .masthead .mark{width:44px;height:44px;flex-shrink:0;}
+  .masthead h1{
+    font-family:var(--serif);
+    font-weight:700;
+    font-size:30px;
+    letter-spacing:-0.01em;
+    color:var(--orchard-dark);
+  }
+  .masthead .tag{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    color:var(--leaf);
+    margin-top:2px;
+  }
+  .subtitle{
+    color:var(--ink-soft);
+    margin:14px 0 30px;
+    font-size:15.5px;
+    max-width:56ch;
+  }
+  .subtitle em{font-style:italic;color:var(--orchard-dark);}
+
+  /* ---------- Upload card ---------- */
+  .upload-section{
+    position:relative;
+    border:1.5px dashed var(--line);
+    border-radius:20px;
+    padding:44px 32px 34px;
+    text-align:center;
+    background:var(--paper-card);
+    box-shadow:var(--shadow-sm);
+    transition:border-color .25s ease, background .25s ease;
+  }
+  .upload-section.dragover{border-color:var(--leaf); background:var(--safe-soft);}
+
+  .mascot-stage{display:flex; justify-content:center; margin-bottom:6px;}
+  .mascot{width:96px; height:96px; --eye-x:0px; --eye-y:0px;}
+  .mascot .pupil{transform:translate(var(--eye-x), var(--eye-y)); transition:transform .08s linear;}
+  .mascot .mouth{display:none;}
+  .mascot[data-mood="neutral"] .mouth-neutral{display:block;}
+  .mascot[data-mood="thinking"] .mouth-neutral{display:block;}
+  .mascot[data-mood="happy"] .mouth-happy{display:block;}
+  .mascot[data-mood="alert"] .mouth-alert{display:block;}
+  .mascot[data-mood="alert"] .brow{display:block;}
+  .mascot[data-mood="happy"] .eye{transform:translateY(1px) scaleY(0.78); transform-origin:center;}
+  .mascot[data-mood="thinking"] .eye-left .pupil,
+  .mascot[data-mood="thinking"] .eye-right .pupil{animation:lookAround 2.4s ease-in-out infinite;}
+  @keyframes lookAround{
+    0%,100%{transform:translate(-2px,0);}
+    50%{transform:translate(2px,0);}
+  }
+
+  .upload-section h3{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:20px;
+    color:var(--orchard-dark);
+    margin-bottom:6px;
+  }
+  .upload-section p{color:var(--ink-soft); font-size:14px; margin:4px 0 14px;}
+
+  .btn-group{display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:10px; margin:14px 0 6px;}
+  .upload-btn-wrapper{position:relative; overflow:hidden; display:inline-block;}
+  .upload-btn-wrapper input[type="file"]{position:absolute; left:0; top:0; opacity:0; width:100%; height:100%; cursor:pointer;}
+  .upload-btn{
+    background:var(--paper-alt);
+    color:var(--orchard-dark);
+    padding:11px 24px;
+    border:1px solid var(--line);
+    border-radius:10px;
+    font-family:var(--sans);
+    font-weight:600;
+    font-size:14.5px;
+    cursor:pointer;
+    transition:.2s;
+  }
+  .upload-btn:hover{background:#EAE1C4; border-color:var(--amber);}
+  .upload-btn:disabled{opacity:.5; cursor:not-allowed;}
+
+  .analyze-btn{
+    background:var(--orchard);
+    color:#fff;
+    padding:11px 26px;
+    border:none;
+    border-radius:10px;
+    font-family:var(--sans);
+    font-weight:600;
+    font-size:14.5px;
+    cursor:pointer;
+    transition:.2s;
+    letter-spacing:0.01em;
+  }
+  .analyze-btn:hover{background:var(--orchard-dark); transform:translateY(-1px);}
+  .analyze-btn:disabled{background:#B9B9AD; cursor:not-allowed; transform:none;}
+
+  .file-info{margin-top:14px; color:var(--ink); font-size:13.5px;}
+  .file-info .file-name{color:var(--apple); font-weight:600;}
+  .sample-link{color:var(--leaf); cursor:pointer; text-decoration:underline; text-underline-offset:3px; margin-top:12px; display:inline-block; font-size:13.5px;}
+  .sample-link:hover{color:var(--orchard-dark);}
+
+  /* ---------- Loading / error ---------- */
+  .loading{display:none; text-align:center; padding:26px;}
+  .loading.active{display:block;}
+  .spinner{
+    border:3px solid var(--line-soft);
+    border-top:3px solid var(--orchard);
+    border-radius:50%;
+    width:32px; height:32px;
+    animation:spin 0.9s linear infinite;
+    margin:0 auto;
+  }
+  @keyframes spin{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}
+  .loading p{margin-top:10px; color:var(--ink-soft); font-size:13.5px; font-family:var(--mono);}
+
+  .error{
+    color:#7A2A20;
+    padding:12px 16px;
+    background:var(--apple-soft);
+    border:1px solid #E3B7AA;
+    border-radius:10px;
+    display:none;
+    margin:16px 0;
+    font-size:14px;
+  }
+  .error.active{display:block;}
+
+  hr.section-divider{border:none; border-top:1px solid var(--line-soft); margin:38px 0;}
+
+  h3.section-head{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:19px;
+    color:var(--orchard-dark);
+    margin-bottom:16px;
+    display:flex;
+    align-items:baseline;
+    gap:8px;
+  }
+  h3.section-head .n{font-family:var(--mono); font-size:12px; color:var(--leaf); letter-spacing:0.1em;}
+
+  /* ---------- Stat cards ---------- */
+  .stats-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px; margin:20px 0;}
+  .stat-card{
+    background:var(--paper-card);
+    border:1px solid var(--line-soft);
+    border-left:4px solid var(--orchard);
+    color:var(--ink);
+    padding:18px 18px;
+    border-radius:12px;
+    box-shadow:var(--shadow-sm);
+  }
+  .stat-card.fraud{border-left-color:var(--apple);}
+  .stat-card.legit{border-left-color:var(--safe);}
+  .stat-card.rate{border-left-color:var(--amber);}
+  .stat-number{font-family:var(--serif); font-size:28px; font-weight:700; color:var(--orchard-dark);}
+  .stat-card.fraud .stat-number{color:var(--apple);}
+  .stat-card.legit .stat-number{color:var(--safe);}
+  .stat-card.rate .stat-number{color:var(--amber);}
+  .stat-label{font-size:12.5px; color:var(--ink-soft); margin-top:2px; text-transform:uppercase; letter-spacing:0.04em;}
+
+  /* ---------- Metric cards ---------- */
+  .metrics-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin:20px 0;}
+  .metric-card{
+    background:var(--paper-card);
+    padding:15px;
+    border-radius:10px;
+    text-align:center;
+    border:1px solid var(--line-soft);
+  }
+  .metric-card .value{font-family:var(--mono); font-size:22px; font-weight:500; color:var(--ink);}
+  .metric-card .label{font-size:11px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.06em; margin-top:4px;}
+  .metric-card .value.good{color:var(--safe);}
+  .metric-card .value.warning{color:var(--amber);}
+  .metric-card .value.danger{color:var(--apple);}
+
+  /* ---------- Charts ---------- */
+  .charts-row{display:grid; grid-template-columns:1fr 1fr; gap:20px; margin:20px 0;}
+  .chart-container{background:var(--paper-card); border:1px solid var(--line-soft); border-radius:14px; padding:18px; text-align:center;}
+  .chart-container img{max-width:100%; height:auto; border-radius:8px;}
+  .chart-container h4{font-family:var(--serif); color:var(--orchard-dark); margin-bottom:12px; font-weight:600; font-size:15px;}
+
+  .feature-list{max-height:280px; overflow-y:auto; text-align:left;}
+  .feature-item{display:flex; justify-content:space-between; align-items:center; padding:7px 10px; margin:4px 0; background:var(--paper-alt); border-radius:6px; font-size:12.5px;}
+  .feature-item .bar-container{flex:1; margin:0 10px; height:6px; background:var(--line-soft); border-radius:4px; overflow:hidden;}
+  .feature-item .bar{height:100%; background:var(--leaf); border-radius:4px; transition:width .5s;}
+  .feature-item .pct{font-family:var(--mono); font-weight:500; color:var(--ink); min-width:48px; text-align:right;}
+
+  /* ---------- Model comparison ---------- */
+  .comparison-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; margin:20px 0;}
+  .model-card{background:var(--paper-card); border-radius:12px; padding:16px; border:1px solid var(--line-soft);}
+  .model-card.best{border-color:var(--safe); background:var(--safe-soft);}
+  .model-card h4{font-family:var(--serif); color:var(--orchard-dark); margin-bottom:10px; font-weight:600; font-size:15px;}
+  .model-card .metric-row{display:flex; justify-content:space-between; padding:3px 0; font-size:12.5px; color:var(--ink-soft);}
+  .model-card .metric-row .m-value{font-family:var(--mono); font-weight:500; color:var(--ink);}
+  .model-card .badge-best{background:var(--safe); color:#fff; padding:3px 11px; border-radius:12px; font-size:10.5px; letter-spacing:.04em; text-transform:uppercase; display:inline-block; margin-top:8px;}
+
+  /* ---------- Table ---------- */
+  .table-container{overflow-x:auto; margin-top:16px; max-height:420px; overflow-y:auto; border:1px solid var(--line-soft); border-radius:12px;}
+  table{width:100%; border-collapse:collapse; font-size:13px; font-family:var(--mono);}
+  th{background:var(--orchard-dark); color:#F4EFE0; padding:11px 12px; position:sticky; top:0; z-index:10; white-space:nowrap; font-weight:500; text-align:left; font-size:11.5px; letter-spacing:.04em; text-transform:uppercase;}
+  td{padding:9px 12px; border-bottom:1px solid var(--line-soft); white-space:nowrap;}
+  tr:hover{background:var(--paper-alt);}
+  .fraud-row{background:var(--apple-soft);}
+  .fraud-row:hover{background:#EFCBBE;}
+
+  .badge{padding:3px 11px; border-radius:20px; font-weight:600; font-size:11px; display:inline-block; font-family:var(--sans);}
+  .badge-fraud{background:var(--apple); color:#fff;}
+  .badge-legit{background:var(--safe); color:#fff;}
+  .badge-high{background:var(--apple); color:#fff;}
+  .badge-medium{background:var(--amber); color:#fff;}
+  .badge-low{background:var(--safe); color:#fff;}
+
+  .download-btn{
+    background:var(--orchard);
+    color:#fff;
+    padding:9px 18px;
+    border:none;
+    border-radius:9px;
+    cursor:pointer;
+    margin-top:8px;
+    font-size:13.5px;
+    font-family:var(--sans);
+    font-weight:600;
+  }
+  .download-btn:hover{background:var(--orchard-dark);}
+  .results-header{display:flex; justify-content:space-between; align-items:center; margin:6px 0 8px; flex-wrap:wrap; gap:10px;}
+
+  @media (max-width:768px){
+    .container{padding:0;}
+    .stats-grid{grid-template-columns:1fr 1fr;}
+    .charts-row{grid-template-columns:1fr;}
+    .comparison-grid{grid-template-columns:1fr;}
+    .btn-group{flex-direction:column;}
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+
+    <div class="masthead">
+      <svg class="mark" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M50,30 C30,30 16,50 16,70 C16,88 32,96 50,96 C68,96 84,88 84,70 C84,50 70,30 50,30 Z" fill="#B23B2E"/>
+        <path d="M50,30 C47,20 40,14 32,12 C33,22 40,29 50,30 Z" fill="#5C7A54"/>
+        <rect x="47.5" y="16" width="4" height="16" rx="2" fill="#3F5236"/>
+        <circle cx="40" cy="62" r="6.5" fill="#F8F4E9"/>
+        <circle cx="61" cy="62" r="6.5" fill="#F8F4E9"/>
+        <circle cx="41" cy="63" r="3" fill="#20291F"/>
+        <circle cx="62" cy="63" r="3" fill="#20291F"/>
+        <path d="M42,78 Q50,84 58,78" stroke="#20291F" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      </svg>
+      <div>
+        <h1>Orchard</h1>
+        <div class="tag">Transaction fraud detection</div>
+      </div>
+    </div>
+
+    <p class="subtitle">Upload a transaction file and Orchard checks every row against a trained model, then explains <em>why</em> — plaintext metrics, feature weight, and a plain verdict on each transaction.</p>
+
+    <div class="upload-section" id="uploadSection">
+
+      <div class="mascot-stage">
+        <svg class="mascot" id="mascot" data-mood="neutral" viewBox="0 0 140 140" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M70,42 C42,42 22,68 22,96 C22,120 44,130 70,130 C96,130 118,120 118,96 C118,68 98,42 70,42 Z" fill="#B23B2E"/>
+          <path d="M70,42 C66,28 56,20 44,17 C45,30 55,40 70,42 Z" fill="#5C7A54"/>
+          <rect x="66.5" y="20" width="6" height="24" rx="3" fill="#3F5236"/>
+          <g class="brow" style="display:none">
+            <path d="M42,80 L56,86" stroke="#4A1A12" stroke-width="3" stroke-linecap="round"/>
+            <path d="M98,80 L84,86" stroke="#4A1A12" stroke-width="3" stroke-linecap="round"/>
+          </g>
+          <g class="eye eye-left">
+            <ellipse cx="55" cy="94" rx="10" ry="11" fill="#F8F4E9"/>
+            <circle class="pupil" cx="55" cy="95" r="4.6" fill="#20291F"/>
+          </g>
+          <g class="eye eye-right">
+            <ellipse cx="85" cy="94" rx="10" ry="11" fill="#F8F4E9"/>
+            <circle class="pupil" cx="85" cy="95" r="4.6" fill="#20291F"/>
+          </g>
+          <path class="mouth mouth-neutral" d="M58,113 Q70,119 82,113" stroke="#4A1A12" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <path class="mouth mouth-happy" d="M54,110 Q70,130 86,110" stroke="#4A1A12" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <ellipse class="mouth mouth-alert" cx="70" cy="115" rx="8" ry="7" fill="#4A1A12"/>
+        </svg>
+      </div>
+
+      <h3>Bring your transactions</h3>
+      <p>CSV with transaction features — Time, V1–V28, Amount.</p>
+
+      <div class="btn-group">
+        <div class="upload-btn-wrapper">
+          <button class="upload-btn" id="chooseBtn">Choose file</button>
+          <input type="file" id="fileInput" accept=".csv">
+        </div>
+        <button class="analyze-btn" id="analyzeBtn" disabled>Analyze</button>
+      </div>
+
+      <div class="file-info" id="fileInfo">
+        <span style="color:#9A9284;">No file selected</span>
+      </div>
+
+      <div>
+        <a class="sample-link" id="sampleLink">Download a sample CSV</a>
+      </div>
+    </div>
+
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      <p>reading the ledger…</p>
+    </div>
+
+    <div class="error" id="error"></div>
+
+    <div id="results" style="display:none;">
+
+      <div class="stats-grid" id="statsGrid"></div>
+
+      <hr class="section-divider">
+
+      <h3 class="section-head">Model performance <span class="n">how well it separated fraud from legitimate activity</span></h3>
+      <div class="metrics-grid" id="metricsGrid"></div>
+
+      <hr class="section-divider">
+
+      <h3 class="section-head">Model comparison</h3>
+      <div id="modelComparison"></div>
+
+      <hr class="section-divider">
+
+      <div class="charts-row">
+        <div class="chart-container">
+          <h4>Confusion matrix</h4>
+          <img id="confusionMatrixPlot" src="" alt="Confusion Matrix">
+        </div>
+        <div class="chart-container">
+          <h4>Top feature weight</h4>
+          <div id="featureImportance"></div>
+        </div>
+      </div>
+
+      <hr class="section-divider">
+
+      <h3 class="section-head">Risk distribution</h3>
+      <div class="stats-grid" id="riskDistribution" style="grid-template-columns:repeat(3,1fr);"></div>
+
+      <hr class="section-divider">
+
+      <div class="results-header">
+        <h3 class="section-head" style="margin-bottom:0;">Transaction results</h3>
+        <button class="download-btn" id="downloadResults">Download results CSV</button>
+      </div>
+
+      <div class="table-container">
+        <table id="resultsTable">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const chooseBtn = document.getElementById('chooseBtn');
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    const fileInfo = document.getElementById('fileInfo');
+    const loading = document.getElementById('loading');
+    const results = document.getElementById('results');
+    const errorDiv = document.getElementById('error');
+    const sampleLink = document.getElementById('sampleLink');
+    const uploadSection = document.getElementById('uploadSection');
+    const mascot = document.getElementById('mascot');
+
+    function setMascotMood(mood){
+      if (mascot) mascot.setAttribute('data-mood', mood);
+    }
+
+    // Otto's eyes follow the cursor, gently.
+    document.addEventListener('mousemove', function(e){
+      if (!mascot) return;
+      const rect = mascot.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const dx = Math.max(-1, Math.min(1, (e.clientX - cx) / 300));
+      const dy = Math.max(-1, Math.min(1, (e.clientY - cy) / 300));
+      mascot.style.setProperty('--eye-x', (dx * 3.2) + 'px');
+      mascot.style.setProperty('--eye-y', (dy * 3) + 'px');
+    });
+
+    chooseBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', function() {
+      if (this.files.length > 0) {
+        const file = this.files[0];
+        const size = (file.size / 1024).toFixed(1);
+        fileInfo.innerHTML = `
+                    <span style="color: #20291F;">Selected: </span>
+                    <span class="file-name">${file.name}</span>
+                    <span style="color: #9A9284;">(${size} KB)</span>
+                `;
+        analyzeBtn.disabled = false;
+      } else {
+        fileInfo.innerHTML = '<span style="color: #9A9284;">No file selected</span>';
+        analyzeBtn.disabled = true;
+      }
+    });
+
+    uploadSection.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      this.classList.add('dragover');
+    });
+
+    uploadSection.addEventListener('dragleave', function(e) {
+      e.preventDefault();
+      this.classList.remove('dragover');
+    });
+
+    uploadSection.addEventListener('drop', function(e) {
+      e.preventDefault();
+      this.classList.remove('dragover');
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        fileInput.files = files;
+        const event = new Event('change');
+        fileInput.dispatchEvent(event);
+      }
+    });
+
+    analyzeBtn.addEventListener('click', async function() {
+      const file = fileInput.files[0];
+      if (!file) {
+        alert('Please select a CSV file first.');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      loading.classList.add('active');
+      results.style.display = 'none';
+      errorDiv.classList.remove('active');
+      analyzeBtn.disabled = true;
+      analyzeBtn.textContent = 'Analyzing…';
+      setMascotMood('thinking');
+
+      try {
+        const response = await fetch('/predict', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+          errorDiv.textContent = data.error;
+          errorDiv.classList.add('active');
+          setMascotMood('alert');
+          return;
+        }
+
+        if (data.success) {
+          displayResults(data.results);
+          window.csvData = data.csv_data;
+          setMascotMood(data.results.fraud_count > 0 ? 'alert' : 'happy');
+        }
+
+      } catch (err) {
+        errorDiv.textContent = 'Error: ' + err.message;
+        errorDiv.classList.add('active');
+        setMascotMood('alert');
+      } finally {
+        loading.classList.remove('active');
+        analyzeBtn.disabled = false;
+        analyzeBtn.textContent = 'Analyze';
+      }
+    });
+
+    function displayResults(resultsData) {
+      // Stats
+      const statsGrid = document.getElementById('statsGrid');
+      statsGrid.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-number">${resultsData.total}</div>
+                    <div class="stat-label">Total Transactions</div>
+                </div>
+                <div class="stat-card fraud">
+                    <div class="stat-number">${resultsData.fraud_count}</div>
+                    <div class="stat-label">Fraud Detected</div>
+                </div>
+                <div class="stat-card legit">
+                    <div class="stat-number">${resultsData.legitimate_count}</div>
+                    <div class="stat-label">Legitimate</div>
+                </div>
+                <div class="stat-card rate">
+                    <div class="stat-number">${resultsData.fraud_rate}%</div>
+                    <div class="stat-label">Fraud Rate</div>
+                </div>
+            `;
+
+      // Metrics
+      const metricsGrid = document.getElementById('metricsGrid');
+      const metrics = resultsData.metrics;
+      metricsGrid.innerHTML = `
+                <div class="metric-card">
+                    <div class="value ${metrics.accuracy > 0.9 ? 'good' : metrics.accuracy > 0.7 ? 'warning' : 'danger'}">${(metrics.accuracy * 100).toFixed(2)}%</div>
+                    <div class="label">Accuracy</div>
+                </div>
+                <div class="metric-card">
+                    <div class="value ${metrics.balanced_accuracy > 0.9 ? 'good' : metrics.balanced_accuracy > 0.7 ? 'warning' : 'danger'}">${(metrics.balanced_accuracy * 100).toFixed(2)}%</div>
+                    <div class="label">Balanced Accuracy</div>
+                </div>
+                <div class="metric-card">
+                    <div class="value ${metrics.precision > 0.8 ? 'good' : metrics.precision > 0.5 ? 'warning' : 'danger'}">${(metrics.precision * 100).toFixed(2)}%</div>
+                    <div class="label">Precision</div>
+                </div>
+                <div class="metric-card">
+                    <div class="value ${metrics.recall > 0.8 ? 'good' : metrics.recall > 0.5 ? 'warning' : 'danger'}">${(metrics.recall * 100).toFixed(2)}%</div>
+                    <div class="label">Recall</div>
+                </div>
+                <div class="metric-card">
+                    <div class="value ${metrics.f1_score > 0.8 ? 'good' : metrics.f1_score > 0.5 ? 'warning' : 'danger'}">${(metrics.f1_score * 100).toFixed(2)}%</div>
+                    <div class="label">F1 Score</div>
+                </div>
+                <div class="metric-card">
+                    <div class="value ${metrics.roc_auc > 0.9 ? 'good' : metrics.roc_auc > 0.7 ? 'warning' : 'danger'}">${(metrics.roc_auc * 100).toFixed(2)}%</div>
+                    <div class="label">ROC-AUC</div>
+                </div>
+                <div class="metric-card">
+                    <div class="value ${metrics.avg_precision > 0.8 ? 'good' : metrics.avg_precision > 0.5 ? 'warning' : 'danger'}">${(metrics.avg_precision * 100).toFixed(2)}%</div>
+                    <div class="label">Avg Precision</div>
+                </div>
+            `;
+
+      // Model Comparison
+      const comparisonDiv = document.getElementById('modelComparison');
+      if (resultsData.model_comparison) {
+        const models = Object.keys(resultsData.model_comparison);
+        const bestModel = resultsData.best_model || models[0];
+
+        comparisonDiv.innerHTML = `<div class="comparison-grid">${models.map(name => {
+          const m = resultsData.model_comparison[name];
+          const isBest = name === bestModel;
+          return `
+                        <div class="model-card ${isBest ? 'best' : ''}">
+                            <h4>${name}</h4>
+                            ${Object.entries(m).map(([key, value]) => `
+                                <div class="metric-row">
+                                    <span>${key}</span>
+                                    <span class="m-value">${(value * 100).toFixed(2)}%</span>
+                                </div>
+                            `).join('')}
+                            ${isBest ? '<div class="badge-best">Best model</div>' : ''}
+                        </div>
+                    `;
+        }).join('')}</div>`;
+      } else {
+        comparisonDiv.innerHTML = '<p style="color: #5B6357; padding: 20px;">Model comparison not available</p>';
+      }
+
+      // Confusion Matrix Plot
+      if (resultsData.confusion_matrix_plot) {
+        document.getElementById('confusionMatrixPlot').src = 'data:image/png;base64,' + resultsData.confusion_matrix_plot;
+      }
+
+      // Feature Importance
+      const featureContainer = document.getElementById('featureImportance');
+      if (resultsData.has_feature_importance && resultsData.feature_importance) {
+        const maxImp = resultsData.feature_importance[0]?.importance || 1;
+        featureContainer.innerHTML = `
+                    <div class="feature-list">
+                        ${resultsData.feature_importance.map(f => `
+                            <div class="feature-item">
+                                <span>${f.feature}</span>
+                                <div class="bar-container">
+                                    <div class="bar" style="width: ${(f.importance / maxImp * 100)}%;"></div>
+                                </div>
+                                <span class="pct">${(f.importance * 100).toFixed(2)}%</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+      } else {
+        featureContainer.innerHTML = '<p style="padding: 20px; color: #5B6357;">Feature importance not available</p>';
+      }
+
+      // Risk Distribution
+      const riskDist = document.getElementById('riskDistribution');
+      const riskData = resultsData.risk_distribution;
+      const colors = { 'High': '#B23B2E', 'Medium': '#BD8A2E', 'Low': '#3C6E49' };
+      riskDist.innerHTML = Object.entries(riskData).map(([level, count]) => `
+                <div class="stat-card" style="border-left-color:${colors[level] || '#28422F'};">
+                    <div class="stat-number" style="color:${colors[level] || '#28422F'};">${count}</div>
+                    <div class="stat-label">${level} Risk</div>
+                </div>
+            `).join('');
+
+      // Table
+      const table = document.getElementById('resultsTable');
+      const thead = table.querySelector('thead');
+      const tbody = table.querySelector('tbody');
+
+      if (resultsData.predictions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 40px; font-family: var(--sans);">No data to display</td></tr>';
+        results.style.display = 'block';
+        return;
+      }
+
+      const headers = Object.keys(resultsData.predictions[0]);
+      thead.innerHTML = `<tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
+
+      tbody.innerHTML = resultsData.predictions.map(row => {
+        const status = row.Status;
+        const isFraud = status.includes('FRAUD');
+        const riskLevel = row.Risk_Level || 'Low';
+
+        let riskBadge = '';
+        if (riskLevel === 'High') riskBadge = 'badge-high';
+        else if (riskLevel === 'Medium') riskBadge = 'badge-medium';
+        else riskBadge = 'badge-low';
+
+        return `<tr class="${isFraud ? 'fraud-row' : ''}">
+                    ${headers.map(h => {
+          let value = row[h];
+          if (h === 'Status') {
+            return `<td><span class="badge ${isFraud ? 'badge-fraud' : 'badge-legit'}">${value}</span></td>`;
+          }
+          if (h === 'Risk_Level') {
+            return `<td><span class="badge ${riskBadge}">${value}</span></td>`;
+          }
+          if (typeof value === 'number') {
+            return `<td>${value.toFixed(4)}</td>`;
+          }
+          return `<td>${value}</td>`;
+        }).join('')}
+                </tr>`;
+      }).join('');
+
+      results.style.display = 'block';
+
+      // Scroll to results
+      results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    document.getElementById('downloadResults').addEventListener('click', function() {
+      if (window.csvData) {
+        const link = document.createElement('a');
+        link.download = 'fraud_detection_results.csv';
+        link.href = 'data:text/csv;base64,' + window.csvData;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    });
+
+    sampleLink.addEventListener('click', async function(e) {
+      e.preventDefault();
+      try {
+        const response = await fetch('/download_sample');
+        if (!response.ok) throw new Error('Failed to download');
+        const blob = await response.blob();
+        const link = document.createElement('a');
+        link.download = 'sample_transactions.csv';
+        link.href = URL.createObjectURL(blob);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+      } catch (err) {
+        errorDiv.textContent = 'Error downloading sample: ' + err.message;
+        errorDiv.classList.add('active');
+      }
+    });
+  </script>
+</body>
+</html>
